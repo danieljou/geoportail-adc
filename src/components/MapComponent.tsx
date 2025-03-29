@@ -1,4 +1,4 @@
-import React, { JSX, useState } from "react";
+import React, { JSX, ReactNode, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -13,15 +13,10 @@ import {
   FaLocationArrow,
   FaUtensilSpoon,
   FaHospitalAlt,
+  FaBars,
+  FaTimes,
 } from "react-icons/fa";
-
-interface Infrastructure {
-  id: number;
-  category: string;
-  name: string;
-  coordinates: [number, number];
-  description?: string;
-}
+import { Infrastructure, infrastructures } from "@/data/infracstrucure";
 
 const bbox = {
   bottomLeft: [3.713963443114351, 11.545413171234246] as [number, number],
@@ -33,46 +28,7 @@ const center: [number, number] = [
 ];
 const initialZoom = 15;
 
-const infrastructures: Infrastructure[] = [
-  {
-    id: 1,
-    category: "Piste",
-    name: "Piste Principale",
-    coordinates: [3.72, 11.55],
-  },
-  {
-    id: 2,
-    category: "Parking",
-    name: "Parking P1",
-    coordinates: [3.722, 11.552],
-  },
-  {
-    id: 3,
-    category: "Toilettes",
-    name: "Toilettes Terminal 1",
-    coordinates: [3.718, 11.551],
-  },
-  {
-    id: 4,
-    category: "Hôtel",
-    name: "Aeroport Hotel",
-    coordinates: [3.719, 11.548],
-  },
-  {
-    id: 5,
-    category: "Bus",
-    name: "Arrêt Bus Navette",
-    coordinates: [3.721, 11.553],
-  },
-  {
-    id: 6,
-    category: "Boutique",
-    name: "Duty-Free Shop",
-    coordinates: [3.717, 11.55],
-  },
-];
-
-const icons: Record<string, JSX.Element> = {
+const icons: Record<string, JSX.Element | ReactNode> = {
   Piste: <FaPlane className="text-blue-600 text-xl" />,
   Parking: <FaParking className="text-orange-600 text-xl" />,
   Toilettes: <FaToilet className="text-gray-600 text-xl" />,
@@ -81,6 +37,17 @@ const icons: Record<string, JSX.Element> = {
   Boutique: <FaShoppingBag className="text-purple-600 text-xl" />,
   Restaurant: <FaUtensilSpoon className="text-sky-500 text-xl" />,
   Hospital: <FaHospitalAlt className="text-sky-600 text-xl" />,
+};
+
+const iconsUnicode: Record<string, string> = {
+  Piste: "✈️",
+  Parking: "🅿️",
+  Toilettes: "🚻",
+  Hôtel: "🏨",
+  Bus: "🚌",
+  Boutique: "🛍️",
+  Restaurant: "🍽️",
+  Hospital: "🏥",
 };
 
 const categoryStyles: Record<string, string> = {
@@ -96,72 +63,156 @@ const categoryStyles: Record<string, string> = {
 
 const GeoportailAeroport: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState<boolean>(false);
+  const [selectedTileLayer, setSelectedTileLayer] = useState<string>("osm");
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [selectedInfrastructure, setSelectedInfrastructure] = useState<Infrastructure | null>(null);
+
+  const toggleMenu = () => {
+    setMenuOpen(!menuOpen);
+  };
+
+  const changeTileLayer = (layer: string) => {
+    setSelectedTileLayer(layer);
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  };
+
+  const handleMarkerClick = (infra: Infrastructure) => {
+    setSelectedInfrastructure(infra);
+  };
+
+  const filteredInfrastructures = infrastructures.filter((infra) => {
+    const matchesCategory = !selectedCategory || infra.category === selectedCategory;
+    const matchesSearch = infra.name.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
 
   return (
-    <div className="p-10 flex justify-center items-center h-screen bg-gray-100 w-full">
-      <MapContainer
-        center={center}
-        zoom={initialZoom}
-        style={{
-          height: "90vh",
-          width: "90%",
-          position: "relative",
-          margin: "auto",
-          zIndex: 999,
-        }}
+    <div className="relative h-screen w-full bg-gray-100 flex">
+      {/* Bouton de menu mobile */}
+      <button
+        className="absolute top-5 left-5 z-50 p-3 bg-indigo-900 text-white rounded-full md:hidden"
+        onClick={toggleMenu}
       >
-        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        {menuOpen ? <FaTimes size={20} /> : <FaBars size={20} />}
+      </button>
 
-        {infrastructures
-          .filter((i) => !selectedCategory || i.category === selectedCategory)
-          .map((infra) => (
+      {/* Menu latéral */}
+      <div
+        className={`absolute md:relative top-0 left-0 h-full w-[280px] bg-white shadow-md transform transition-transform duration-300 ease-in-out z-40 p-4 overflow-y-auto md:block ${menuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
+      >
+        <div className="bg-gray-900 p-4 rounded-lg flex items-center gap-2">
+          <FaSearch className="text-white text-lg" />
+          <input
+            type="text"
+            placeholder="Rechercher..."
+            className="flex-1 rounded-md bg-transparent text-white outline-none placeholder-gray-300"
+            value={searchTerm}
+            onChange={handleSearchChange}
+          />
+          <FaLocationArrow className="text-white text-lg" />
+        </div>
+        <ul className="text-sm space-y-2 py-4">
+          {/* Ajouter l'option "Tout afficher" */}
+          <li className="w-full">
+            <button
+              onClick={() => setSelectedCategory(null)}
+              className={`flex items-center gap-2 p-2 rounded cursor-pointer w-full ${selectedCategory === null ? "bg-gray-200" : ""}`}
+            >
+              <span className="text-xl p-3 rounded-md bg-gray-200">
+                <FaSearch className="text-black text-xl" />
+              </span>
+              <span className="font-medium">Tout afficher</span>
+            </button>
+          </li>
+          {/* Liste des catégories */}
+          {Object.entries(icons).map(([category, icon]) => (
+            <li key={category} className="w-full">
+              <button
+                onClick={() => setSelectedCategory(category)}
+                className={`flex items-center gap-2 p-2 rounded cursor-pointer w-full ${selectedCategory === category ? "bg-gray-200" : ""}`}
+              >
+                <span className={`text-xl p-3 rounded-md ${categoryStyles[category]}`}>{icon}</span>
+                <span className="font-medium">{category}</span>
+              </button>
+            </li>
+          ))}
+          {/* Changer de fond de carte */}
+          <div className="mt-4">
+            <h4 className="font-medium mb-2">Fonds de carte</h4>
+            <button
+              onClick={() => changeTileLayer("osm")}
+              className={`p-2 rounded ${selectedTileLayer === "osm" ? "bg-gray-200" : ""}`}
+            >
+              OpenStreetMap
+            </button>
+            <button
+              onClick={() => changeTileLayer("satellite")}
+              className={`p-2 mt-2 rounded ${selectedTileLayer === "satellite" ? "bg-gray-200" : ""}`}
+            >
+              Satellite
+            </button>
+          </div>
+        </ul>
+      </div>
+
+      {/* Carte Leaflet */}
+      <div className="flex-1 z-0">
+        <MapContainer
+          center={center}
+          zoom={initialZoom}
+          style={{ height: "100vh", width: "100%", zIndex: 0 }}
+        >
+          {/* Changer le fond de carte en fonction de la sélection */}
+          {selectedTileLayer === "osm" && (
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          )}
+          {selectedTileLayer === "satellite" && (
+            <TileLayer url="https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png" />
+          )}
+          {filteredInfrastructures.map((infra) => (
             <Marker
               key={infra.id}
               position={infra.coordinates}
               icon={L.divIcon({
-                html: icons[infra.category]?.props?.children || "",
-                className: "text-2xl",
+                html: `<div class='text-2xl'>${iconsUnicode[infra.category] || "❓"}</div>`,
+                className: "",
                 iconSize: [25, 25],
               })}
+              eventHandlers={{
+                click: () => handleMarkerClick(infra),
+              }}
             >
               <Popup>{infra.name}</Popup>
             </Marker>
           ))}
+        </MapContainer>
+      </div>
 
-        <div className="space-y-2 absolute top-3 left-3 w-[400px] z-[1000] bg-white h-fit overflow-y-auto">
-          <div className="bg-gray-900 p-4 h-40 flex justify-center items-center ">
-            <div className="w-full top-5 left-5 right-5 bg-indigo-900 p-4 rounded-lg shadow-lg flex items-center gap-2">
-              <FaSearch className="text-white text-lg" />
-              <input
-                type="text"
-                placeholder="Rechercher..."
-                // value={searchTerm}
-                // onChange={(e) => setSearchTerm(e.target.value)}
-                className="flex-1 rounded-md bg-transparent text-white outline-none placeholder-gray-300"
-              />
-              <FaLocationArrow className="text-white text-lg" />
-            </div>
+      {/* Panneau latéral droit */}
+      {selectedInfrastructure && (
+        <div className="absolute top-0 right-0 h-full w-[320px] bg-white shadow-md p-4 z-50 transform transition-transform duration-300 ease-in-out">
+          <button
+            className="absolute top-5 right-5 text-2xl text-gray-600"
+            onClick={() => setSelectedInfrastructure(null)}
+          >
+            <FaTimes />
+          </button>
+          <div className="flex items-center gap-4">
+            <div className="text-3xl">{iconsUnicode[selectedInfrastructure.category] || "❓"}</div>
+            <div className="font-semibold text-xl">{selectedInfrastructure.name}</div>
           </div>
-          <ul className="text-sm space-y-2 p-4 overflow-y-scroll h-[600px] py-10">
-            {Object.entries(icons).map(([category, icon]) => (
-              <li key={category} className="w-full">
-                <button
-                  onClick={() => setSelectedCategory(category)}
-                  className={`flex items-center gap-2 p-2 rounded cursor-pointer w-full `}
-                >
-                  <span
-                    className={`text-xl p-4 rounded-md ${categoryStyles[category]}`}
-                  >
-                    {icon}
-                  </span>
-                  <span className="font-medium">{category}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
+          <div className="mt-4">
+            <p className="font-medium">Category: {selectedInfrastructure.category}</p>
+            <p>Location: {selectedInfrastructure.coordinates.join(", ")}</p>
+          </div>
         </div>
-      </MapContainer>
+      )}
     </div>
   );
 };
+
 export default GeoportailAeroport;
